@@ -1,8 +1,9 @@
 [package]
-name = "schema2up"
-version = "0.1.0"
+name = "model2schema"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
-regex = "1"
+chrono = "0.4"
 clap = { version = "4.4", features = ["derive"] }
+regex = "1"
