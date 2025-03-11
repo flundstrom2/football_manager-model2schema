@@ -1,5 +1,4 @@
 use regex::Regex;
-use core::task;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use chrono::Local;
@@ -52,7 +51,7 @@ fn main() -> io::Result<()> {
         let columns_definition = &table_match[2];
 
         // Start the table! statement
-         println!("Creating table: '{}' with primary_key '{}'", table_name, primary_key);
+        println!("Creating table: '{}' with primary_key '{}'", table_name, primary_key);
         writeln!(schema_rs, "table! {}", '{')?;
         writeln!(schema_rs, "    {} ({}) {}", table_name, primary_key, '{')?;
 
@@ -60,16 +59,14 @@ fn main() -> io::Result<()> {
         println!("     first: '{}'", first);
         println!("     columns_definition: '{}'", columns_definition);
         let mut column_iter = column_re.captures_iter(columns_definition);
-        let mut first_column_name = "".to_string(); 
-        let mut first_column_type = "".to_string(); 
         let mut first_column_ok = false;
         let mut number_of_columns = 0;
         if let Some(first_column) = column_iter.next() {
             if first_column.len() < 2   {
                 panic!("FATAL: Column definition first_column not found for table: '{}'", table_name);
             } else {
-                first_column_name = first_column[1].to_string();
-                first_column_type = first_column[2].to_string();
+                let first_column_name = first_column[1].to_string();
+                let first_column_type = first_column[2].to_string();
                 if first_column_name == primary_key && first_column_type == "Uuid" {
                     println!("      first_column: '{}' : '{}'", first_column_name, first_column_type);
                     number_of_columns += 1;
@@ -85,12 +82,16 @@ fn main() -> io::Result<()> {
         
         // Add the remaining columns
         for column_match in column_iter {
-            if column_match.len() < 2 {
+            if column_match.len() < 3 {
                 panic!("Column definition column_match not found for table: {}", table_name);
             } else {
-                let column_name = column_match[1].to_string();
-                let column_type = column_match[2].to_string();
-                println!("      column_match: '{}' => '{}' {}", column_match[0].to_string(), column_name, column_type);
+                // I cant get the matching of the optimal column to work!
+                let column_name = column_match[1].trim().to_string();
+                let column_type = column_match[2].trim().to_string();
+                if column_name.ends_with("_opt") {
+                    println!("OPTIONAL")
+                }
+                println!("      column_match: '{}' => '{}' type: '{}'", column_match[0].trim().to_string(), column_name, column_type);
                 writeln!(schema_rs, "        {} -> {},", column_name, map_column_type(&column_type).to_string())?;
                 number_of_columns += 1; 
             }
