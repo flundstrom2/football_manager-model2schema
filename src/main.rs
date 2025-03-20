@@ -10,11 +10,21 @@ fn main() -> io::Result<()> {
         pub\s+(\w+)\s*:\s*(\w+(<[\w]+>)?)\s*,\s*
     "#).replace(" ", "").replace("\n", "");
 
+    /* Regexp:
+        (?:\s*\/\/.*\n)*?       # Ignore single-line comments
+        (?:\s*\/\*.*?\*\/\s*)?  # Ignore multi-line comments
+     */
     let table_res = r#"
         #\[table_name\s+=\s+"(\w+)"\]\s*
-        pub\s+struct\s+\w+\s*\{(\s*
-            (pub\s+(\w+)\s*:\s*(\w+(<[\w]+>)?)\s*,\s*)+
-        )\}\s*
+        pub\s+struct\s+\w+\s*\{
+            (\s*
+                (
+                    (?:\s*\/\/.*\n)*?
+                    (?:\s*\/\*.*?\*\/\s*)?
+                    (pub\s+(\w+)\s*:\s*(\w+(<[\w]+>)?)\s*,\s*)?
+                )+
+            )
+        \}\s*
     "#.replace(" ", "").replace("\n", "");
     
     let table_re =  Regex::new(table_res.as_str()).unwrap();
@@ -151,7 +161,8 @@ fn map_column_type(rust_type: &str) -> &str {
         "Vec<Int4>" => "Array<Int4>",
         "Vec<Int2>" => "Array<Int2>",
         "Vec<Bool>" => "Array<Bool>",
-        _ => "Varchar", // Default to Varchar for unknown types
+        "Value" => "Jsonb", // serde_json::Value
+        _ => "Int4", // Default to Int4 for unknown types
     }
 }
 
