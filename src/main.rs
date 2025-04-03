@@ -146,6 +146,7 @@ fn map_column_type(rust_type: &str) -> &str {
         "i16" => "Int2",
         "i8" => "Int8",
 //        "Text" => "Text",
+        "bool" => "Bool",
         "Bool" => "Bool",
         "f32" => "Float4",
         "f64" => "Float8",
@@ -160,6 +161,7 @@ fn map_column_type(rust_type: &str) -> &str {
         "Vec<Int8>" => "Array<Int8>",
         "Vec<Int4>" => "Array<Int4>",
         "Vec<Int2>" => "Array<Int2>",
+        "Vec<bool>" => "Array<Bool>",
         "Vec<Bool>" => "Array<Bool>",
         "Value" => "Jsonb", // serde_json::Value
         _ => "Int4", // Default to Int4 for unknown types
