@@ -7,7 +7,7 @@ use chrono::Local;
 
 fn main() -> io::Result<()> {
     let column_res = String::from(r#"
-        pub\s+(\w+)\s*:\s*(\w+)\s*,\s*
+        (?:pub\s+)*(\w+)\s*:\s*(\w+(?:\s*<[\w'&\s\(\)]+>)?)\s*,\s*
     "#).replace(" ", "").replace("\n", "");
 
     /* Regexp:
@@ -101,12 +101,20 @@ fn main() -> io::Result<()> {
                 panic!("Column definition column_match not found for table: {}", table_name);
             } else {
                 // I cant get the matching of the optimal column to work!
+                let column_row = column_match[0].trim().to_string();
                 let column_name = column_match[1].trim().to_string();
                 let column_type = column_match[2].trim().to_string();
+                let mut opt_or_ignore = "";
                 if column_name.ends_with("_opt") {
-                    println!("OPTIONAL")
+                    opt_or_ignore = " OPTIONAL";
                 }
-                println!("     column_match: '{}' => '{}' type: '{}'", column_match[0].trim().to_string(), column_name, column_type);
+                if column_type.starts_with("PhantomData") {
+                    opt_or_ignore = " IGNORE";
+                }
+                println!("     column_match: '{}' => '{}' type: '{}'{}", column_row, column_name, column_type, opt_or_ignore);
+                if opt_or_ignore == " IGNORE" {
+                    continue;
+                }
                 writeln!(schema_rs, "        {} -> {},", column_name, map_column_type(&column_type).to_string())?;
                 number_of_columns += 1; 
             }
