@@ -7,25 +7,29 @@ use chrono::Local;
 
 fn main() -> io::Result<()> {
     let column_res = String::from(r#"
-        pub\s+(\w+)\s*:\s*(\w+(<[\w]+>)?)\s*,\s*
+        pub\s+(\w+)\s*:\s*(\w+)\s*,\s*
     "#).replace(" ", "").replace("\n", "");
 
     /* Regexp:
         (?:\s*\/\/.*\n)*?       # Ignore single-line comments
         (?:\s*\/\*.*?\*\/\s*)?  # Ignore multi-line comments
      */
-    let table_res = r#"
+    let table_res = [
+        r#"
         #\[table_name\s+=\s+"(\w+)"\]\s*
-        pub\s+struct\s+\w+\s*\{
+        pub\s+struct\s+(\w+(?:\s*<[\w'&\s]+>)?)\s*\{
             (\s*
                 (
                     (?:\s*\/\/.*\n)*?
                     (?:\s*\/\*.*?\*\/\s*)?
-                    (pub\s+(\w+)\s*:\s*(\w+(<[\w]+>)?)\s*,\s*)?
+        "#,
+        column_res.as_str(),
+        r#"
                 )+
             )
         \}\s*
-    "#.replace(" ", "").replace("\n", "");
+    "#
+    ].join("\n").replace(" ", "").replace("\n", "");
     
     let table_re =  Regex::new(table_res.as_str()).unwrap();
     let column_re = Regex::new(column_res.as_str()).unwrap();
@@ -58,16 +62,17 @@ fn main() -> io::Result<()> {
         let first = &table_match[0];
         let table_name = &table_match[1];
         let primary_key = "id";
-        let columns_definition = &table_match[2];
-
+        let struct_name = &table_match[2];
+        let columns_definition = &table_match[3];
+        
         // Start the table! statement
-        println!("Creating table: '{}' with primary_key '{}'", table_name, primary_key);
+        println!("Creating table: '{}' with expected primary_key '{}' for struct name '{}'", table_name, primary_key, struct_name);
         writeln!(schema_rs, "table! {}", '{')?;
         writeln!(schema_rs, "    {} ({}) {}", table_name, primary_key, '{')?;
 
         println!("  Iterate over each column definition..");
-        println!("     first: '{}'", first);
-        println!("     columns_definition: '{}'", columns_definition);
+        println!("     first: \n'\n{}'", first);
+        println!("     columns_definition: \n     ==============={}     ===============", columns_definition.replace("    ", "        "));
         let mut column_iter = column_re.captures_iter(columns_definition);
         let mut first_column_ok = false;
         let mut number_of_columns = 0;
@@ -78,7 +83,7 @@ fn main() -> io::Result<()> {
                 let first_column_name = first_column[1].to_string();
                 let first_column_type = first_column[2].to_string();
                 if first_column_name == primary_key && first_column_type == "Uuid" {
-                    println!("      first_column: '{}' : '{}'", first_column_name, first_column_type);
+                    println!("     first_column: '{}' : '{}'", first_column_name, first_column_type);
                     number_of_columns += 1;
                     first_column_ok = true;
                 } else {
@@ -101,7 +106,7 @@ fn main() -> io::Result<()> {
                 if column_name.ends_with("_opt") {
                     println!("OPTIONAL")
                 }
-                println!("      column_match: '{}' => '{}' type: '{}'", column_match[0].trim().to_string(), column_name, column_type);
+                println!("     column_match: '{}' => '{}' type: '{}'", column_match[0].trim().to_string(), column_name, column_type);
                 writeln!(schema_rs, "        {} -> {},", column_name, map_column_type(&column_type).to_string())?;
                 number_of_columns += 1; 
             }
