@@ -21,25 +21,6 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'model2schema'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=model2schema",
-                    "--package=model2schema"
-                ],
-                "filter": {
-                    "name": "model2schema",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
         }
     ]
 }
