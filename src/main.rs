@@ -1,6 +1,7 @@
 use regex::Regex;
 use std::fs::{self, File};
 use std::io::{self, Write};
+use tracing::*;
 
 
 
@@ -33,21 +34,21 @@ fn main() -> io::Result<()> {
     let table_re =  Regex::new(table_res.as_str()).unwrap();
     let column_re = Regex::new(column_res.as_str()).unwrap();
 
-    println!("Reading ./models.rs file...");
+    info!("Reading ./models.rs file...");
     let models_content = match fs::read_to_string("./models.rs") {
         Ok(content) => content,
         Err(e) => {
-            println!("FATAL: Failed to open models.rs file: {}", e);
+            error!("FATAL: Failed to open models.rs file: {}", e);
 
             return Err(e);
         }
     };
 
-    println!("Creating ./schema.rs file...");
+    info!("Creating ./schema.rs file...");
     let mut schema_rs = match File::create("./schema.rs") { 
         Ok(file) => file,
         Err(e) => {
-            println!("FATAL: Failed to create schema.rs file: {}", e);
+            error!("FATAL: Failed to create schema.rs file: {}", e);
 
             return Err(e);
         }
@@ -57,7 +58,7 @@ fn main() -> io::Result<()> {
     writeln!(schema_rs, "#![allow(non_local_definitions)]")?;
 
 
-    println!("Iterate over each table definition..");
+    info!("Iterate over each table definition..");
     let mut number_of_tables = 0;
     for table_match in table_re.captures_iter(&models_content) {
         let first = &table_match[0];
@@ -67,39 +68,41 @@ fn main() -> io::Result<()> {
         let columns_definition = &table_match[3];
         
         // Start the table! statement
-        println!("Creating table: '{}' with expected primary_key '{}' for struct name '{}'", table_name, primary_key, struct_name);
+        info!("Creating table: '{}' with expected primary_key '{}' for struct name '{}'", table_name, primary_key, struct_name);
         writeln!(schema_rs, "table! {}", '{')?;
         writeln!(schema_rs, "    {} ({}) {}", table_name, primary_key, '{')?;
 
-        println!("  Iterate over each column definition..");
-        println!("     first: \n'\n{}'", first);
-        println!("     columns_definition: \n     ==============={}     ===============", columns_definition.replace("    ", "        "));
+        info!("  Iterate over each column definition..");
+        debug!("     first: \n'\n{}'", first);
+        debug!("     columns_definition: \n     ==============={}     ===============", columns_definition.replace("    ", "        "));
         let mut column_iter = column_re.captures_iter(columns_definition);
         let mut first_column_ok = false;
         let mut number_of_columns = 0;
         if let Some(first_column) = column_iter.next() {
             if first_column.len() < 2   {
-                panic!("FATAL: Column definition first_column not found for table: '{}'", table_name);
+                error!("Column definition first_column not found for table: '{}'", table_name);
+                continue;
             } else {
                 let first_column_name = first_column[1].to_string();
                 let first_column_type = first_column[2].to_string();
                 if first_column_name == primary_key && first_column_type == "Uuid" {
-                    println!("     first_column: '{}' : '{}'", first_column_name, first_column_type);
+                    debug!("     first_column: '{}' : '{}'", first_column_name, first_column_type);
                     number_of_columns += 1;
                     first_column_ok = true;
                 } else {
-                    println!("WARNING: First column '{}' with type '{}' is not  primary key: '{}'", first_column_name, first_column_type, primary_key);
+                    warn!("First column '{}' with type '{}' is not  primary key: '{}'", first_column_name, first_column_type, primary_key);
                 }
                 writeln!(schema_rs, "        {} -> {},", first_column_name, map_column_type(&first_column_type).to_string())?;
             }
         } else {
-            panic!("FATAL: Column definition first_column not found for table: '{}'", table_name);
+            error!("Column definition first_column not found for table: '{}'", table_name);
         }
         
         // Add the remaining columns
         for column_match in column_iter {
             if column_match.len() < 3 {
-                panic!("Column definition column_match not found for table: {}", table_name);
+                error!("Column definition column_match not found for table: {}", table_name);
+                continue;
             } else {
                 // I cant get the matching of the optimal column to work!
                 let column_row = column_match[0].trim().to_string();
@@ -112,7 +115,7 @@ fn main() -> io::Result<()> {
                 if column_type.starts_with("PhantomData") {
                     opt_or_ignore = " IGNORE";
                 }
-                println!("     column_match: '{}' => '{}' type: '{}'{}", column_row, column_name, column_type, opt_or_ignore);
+                debug!("     column_match: '{}' => '{}' type: '{}'{}", column_row, column_name, column_type, opt_or_ignore);
                 if opt_or_ignore == " IGNORE" {
                     continue;
                 }
@@ -124,11 +127,11 @@ fn main() -> io::Result<()> {
         writeln!(schema_rs, "    {}", '}')?;
 
         if number_of_columns == 0 {
-            panic!("FATAL: No columns found in models.rs file for table {}.", table_name);
+            error!("No columns found in models.rs file for table {}.", table_name);
         } else if first_column_ok  {
-            println!("Table '{}' generated successfully with {} columns.", table_name, number_of_columns);
+            info!("Table '{}' generated successfully with {} columns.", table_name, number_of_columns);
         } else {
-            println!("WARNING: table '{}': generated without valid primary column in models.rs file.", table_name);
+            error!("table '{}': generated without valid primary column in models.rs file.", table_name);
         }
 
         writeln!(schema_rs, "{}", '}')?;
@@ -137,15 +140,15 @@ fn main() -> io::Result<()> {
     }
 
     if number_of_tables == 0 {
-        panic!("ERROR: No table found in models.rs file.");
+        error!("No table found in models.rs file.");
     } else {
-        println!("DONE: schema.rs generated successfully with {} tables.", number_of_tables);
+        info!("DONE: schema.rs generated successfully with {} tables.", number_of_tables);
     }
 
     match schema_rs.flush() {
         Ok(_) => return Ok(()),
         Err(e) => {
-            println!("FATAL: schema.rs: {}", e);
+            error!("FATAL: schema.rs: {}", e);
             return Err(e);
         }
     }
